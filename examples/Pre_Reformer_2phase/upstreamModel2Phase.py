@@ -27,7 +27,7 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
         A_z_W = ((r_E + dr_E)**2 - r_E**2) * np.pi  # [m²] cross sectional area of the wall
         A_r_W = (r_E + dr_E) * 2 * np.pi * dz_E  # [m²] transfer area between wall and isolation
 
-        P = 40e5  # [Pa] pressure
+        P = 30e5  # [Pa] pressure
 
         D_W = 15  # [] heat
         rhoW = 7.87e6  # [g/m³] density of the wall
@@ -44,7 +44,7 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
         hL = CP.PropsSI("H", "Q", 0, "P", P, "Water") / 1000  # j/g
         hV = CP.PropsSI("H", "Q", 1, "P", P, "Water") / 1000  # j/g
         hLV = hV - hL  # [j/g] heat of evaporation
-        T_sat = CP.PropsSI("T", "Q", 0, "P", P, "Water")-273.15 - 20 # [°C] saturation temperature
+        T_sat = CP.PropsSI("T", "Q", 0, "P", P, "Water")-273.15 # [°C] saturation temperature
         U_L = 2000  # [] heat transfer coefficient liquid phase
         U_V = 1000   # [] heat transfer coefficient vapor phase
 
@@ -96,7 +96,7 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
 
         # calculate the heating power from MV
         Qdot_E = Qdot_E * 3600 / 100  # [W]
-
+        #Qdot_E = -0.318 * (Qdot_E ) ** 2 + 64.163 * (Qdot_E) + 275.54
         # calculate the liquid phase velocity
         v_L = (mdot_N + mdot_W) / rhoL * 1000 / 3600 / A_z_E
 
@@ -175,9 +175,9 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
 
 
         # set some auxillaryies
-        #model.set_expression('v_L', v_L)
-        model.set_expression('mDot', mDotE(a_E, T_FE, T_sat))
-        model.set_expression('Qdot', Qdot_E * dz_E / 0.636)
+        model.set_expression('v_L', v_L)
+        #model.set_expression('mDot', mDotE(a_E, T_FE, T_sat))
+        model.set_expression('Qdot', Qdot_E)
         ## setup and return of the model ###############################################################################
 
         # set RHS in the model object

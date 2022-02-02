@@ -33,7 +33,7 @@ def template_model_3(system_type='SX', nD_Evap=40, modelUsage=0):
         rhoW = 7.87e6  # [g/m³] density of the wall
         cpW = 0.5  # [J/g/k] heat capacity of the wall
         T_Env = 20  # [°C] environmental temperature
-        kEvap = 1.4  # [W/m²] heat loss coefficient
+        kEvap = 1#25  # [W/m²] heat loss coefficient
 
         ## Water properties
         rhoL = CP.PropsSI("D", "Q", 0, "P", P, "Water") * 1000  # [g/m³] # density of the liquid phase
@@ -86,36 +86,47 @@ def template_model_3(system_type='SX', nD_Evap=40, modelUsage=0):
 
         # define helper functions
         ReLU = Function('ReLU', [x], [fmax(x, 0)])
-        #ReLU = Function('soft', [x], [(x + sqrt(x**2 + 1e-5))/2])
 
         mDotE = Function('mDotE', [aE, TF, TS], [ReLU(beta * aE * (TF - TS)/TS)]) # [1/s] evaporation rate based on LEE model
         mDotC = Function('mDotC', [aE, TF, TS], [ReLU(beta * (1-aE) * (TS - TF) / TS)])  # [1/s] condensation rate based on LEE model
 
+
+        # heat capacity
+        #cp_F = Function('cpF', [aE, aEN], [aE * cpL + aEN * cpLN + (1-aE-aEN) * cpV])
+        cp_F = Function('cpF', [aE, aEN], [aE*cpL + (a_E_0-aE)*cpV + aEN*cpLN + (a_EN_0 - aEN) * cpVN])
+        # density
+        #rho_F = Function('rhoF', [aE, aEN], [aE * rhoL + aEN * rhoLN + (1-aE-aEN) * rhoV])
+        rho_F = Function('rhoF', [aE, aEN], [aE * rhoL + (a_E_0-aE)*cpV + aEN * rhoLN + (a_EN_0-aEN) * rhoVN])
         # heat transfer coefficient
         U_F = Function('U_F', [aE, aEN], [(aE + aEN) * U_L + (1-aE-aEN) * U_V])
 
         ## define RHS ##################################################################################################
         # predefine the RHS
-        da_E = SX.sym('da_E',  nD_Evap, 1)
+        da_E  = SX.sym('da_E',  nD_Evap, 1)
         da_EN = SX.sym('da_E',  nD_Evap, 1)
         dT_FE = SX.sym('dT_FE', nD_Evap, 1)
         dT_WE = SX.sym('dT_WE', nD_Evap, 1)
 
         # calculate the heating power from MV
         Qdot_E = Qdot_E * 3600 / 100  # [W]
+        #Qdot_E = -0.318 * (Qdot_E ) ** 2 + 64.163 * (Qdot_E) + 275.54
 
         # calculate the liquid phase velocity
         v_L = (mdot_N / rhoLN + mdot_W / rhoL) * 1000 / 3600 / A_z_E
 
-
+        # superficial fluid velocity
+        v_F = Function('v_F', [aE, aEN], [(aE + aEN) * v_L + (1-aE-aEN) * S_L * v_L])
 
         # loop over the discretisation points
         for i in range(0, nD_Evap):
 
             # compute the mass streams due to condensation and evaporation
             mDotE_i = mDotE(a_E[i], T_FE[i], T_sat) * rhoL
-            mDotN_i = mDotC(a_EN[i], T_FE[i], T_sat) * rhoLN
+            mDotN_i = mDotE(a_EN[i], T_FE[i], T_sat) * rhoLN
             U_F_i = U_F(a_E[i], a_EN[i])
+            rhoF_i = rho_F(a_E[i], a_EN[i])
+            cpF_i = cp_F(a_E[i], a_EN[i])
+            vF_i = v_F(a_E[i], a_EN[i])
 
             # get the heating power i
             iZ = i * dz_E
@@ -136,23 +147,15 @@ def template_model_3(system_type='SX', nD_Evap=40, modelUsage=0):
 
             # volume fraction
             if i != 0:
-                da_E[i] = - v_L * da_dz_i -  mDotE_i / rhoL
-                da_EN[i] = - v_L * daN_dz_i -  mDotN_i / rhoLN
+                da_E[i] = - v_L * da_dz_i - mDotE_i / rhoL
+                da_EN[i] = - v_L * daN_dz_i - mDotN_i / rhoLN
 
             # fluid temperature
             if i != 0:
                 V_i  = A_z_E * dz_E
-                a_V_i = (1 - a_E[i] - a_EN[i])
-                epsilon_i = a_V_i * S_L * cpV * rhoV + a_E[i] * cpL * rhoL + a_EN[i] * cpLN * rhoLN
-                gamma_i = a_V_i * cpV * rhoV + a_E[i] * cpL * rhoL + a_EN[i] * cpLN * rhoLN
-                dT_FE[i] = - v_L * (epsilon_i / gamma_i) * dTF_dz_i \
-                    - 0*v_L * (cpL * rhoL - S_L * cpV * rhoV) * T_FE[i] * da_dz_i / epsilon_i \
-                    - 0*v_L * (cpLN * rhoLN - S_L * cpV * rhoV) * T_FE[i] * daN_dz_i / epsilon_i \
-                    - 0*T_FE[i] * (cpL * rhoL - cpV * rhoV) / epsilon_i * da_E[i] \
-                    - 0*T_FE[i] * (cpLN * rhoLN - cpV * rhoV) / epsilon_i * da_EN[i] \
-                    - mDotE_i * hLV / epsilon_i \
-                    - mDotN_i * hLVN / epsilon_i \
-                    + U_F_i * A_r_E * (T_WE[i] - T_FE[i]) / epsilon_i
+                dT_FE[i] = - vF_i * dTF_dz_i \
+                           + (U_F_i * A_r_E) / (V_i * rhoF_i * cpF_i) * (T_WE[i] - T_FE[i]) \
+                           - (mDotE_i*hLV + mDotN_i*hLVN) / (rhoF_i * cpF_i)
 
             # wall temperature
             if i != 0 and i != (nD_Evap-1):
@@ -189,9 +192,9 @@ def template_model_3(system_type='SX', nD_Evap=40, modelUsage=0):
 
 
         # set some auxillaryies
-        #model.set_expression('v_L', v_L)
-        model.set_expression('a_E_0', a_E_0)
-        model.set_expression('a_EN_0', a_EN_0)
+        model.set_expression('v_L', v_L)
+        model.set_expression('v_V', v_L * S_L)
+
         ## setup and return of the model ###############################################################################
 
         # set RHS in the model object

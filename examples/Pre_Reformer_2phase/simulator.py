@@ -15,7 +15,7 @@ def template_simulator(model, cpL=None, cpV=None, kEvap=None, U_L=None, U_V=None
     # define the simulation parameters
     params_simulator = {
         'integration_tool': 'idas',
-        't_step': 60,
+        't_step': 30,
         'abstol': 1e-10,
         'reltol': 1e-10
     }
