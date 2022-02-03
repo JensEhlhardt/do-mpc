@@ -34,7 +34,7 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
         rhoW = 7.87e6  # [g/m³] density of the wall
         cpW = 0.5  # [J/g/k] heat capacity of the wall
         T_Env = 20  # [°C] environmental temperature
-        kEvap = 3 #1.4  # [W/m²] heat loss coefficient
+        kEvap = 1.5  # [W/m²] heat loss coefficient
         S_V = 1000  # [m²/m³] specific surface packing
 
         rhoL = CP.PropsSI("D", "Q", 0, "P", P, "Water") * 1000  # [g/m³] # density of the liquid phase
@@ -48,14 +48,15 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
         hLV = hV - hL  # [j/g] heat of evaporation
         T_sat = CP.PropsSI("T", "Q", 0, "P", P, "Water")-273.15 # [°C] saturation temperature
         U_L = 1000  # [] heat transfer coefficient liquid phase
-        U_V = 500   # [] heat transfer coefficient vapor phase
+        U_V = 200   # [] heat transfer coefficient vapor phase
 
         ## set the variables
         a_E = model.set_variable(var_type='_x', var_name='a_E', shape=(nD_Evap, 1))  # volume fraction of the liquid
         T_FE = model.set_variable(var_type='_x', var_name='T_FE', shape=(nD_Evap, 1))  # pseudo fluid temperature
         T_WE = model.set_variable(var_type='_x', var_name='T_WE', shape=(nD_Evap, 1))  # wall temperature
         T_PE = model.set_variable(var_type='_x', var_name='T_PE', shape=(nD_Evap, 1))  # packing temperature
-        #v_LL = model.set_variable(var_type='_x', var_name='v_LL', shape=(nD_Evap, 1))
+
+
         # set the inputs
         Qdot_E = model.set_variable(var_type='_u', var_name='Qdot_E', shape=(1, 1))  # [%] heating power percentage evaporator
         mdot_W = model.set_variable(var_type='_u', var_name='mdot_W', shape=(1, 1))  # [g/s] inlet flow of water
