@@ -13,8 +13,8 @@ import CoolProp.CoolProp as CP
 
 
 def readAndCutData():
-    #dataset = pd.read_excel("data/validationData.xlsx")
-    dataset = pd.read_excel("data/naphthaPumpII.xlsx")
+    dataset = pd.read_excel("data/validationData_.xlsx")
+    #dataset = pd.read_excel("data/evapRedo.xlsx")
     firstIndex = 5
     dataset = dataset[dataset.index >= firstIndex]
 
@@ -72,13 +72,13 @@ for i in validationData.index:
 
 
 ## Plot comparison
-
+do_mpc.graphics.default_plot(simulator.data)
 fig, ax = plt.subplots(3, 1)
 
 validationData.plot(x="time_min", y="TI21.PV", ax=ax[0])
-validationData.plot(x="time_min", y="WI01.MV", ax=ax[1])
-validationData.plot(x="time_min", y="FIC14.MV", ax=ax[1])
-validationData.plot(x='time_min', y="FIC13.MV", ax=ax[1])
+validationData.plot(x="time_min", y="WI01.SV", ax=ax[1])
+validationData.plot(x="time_min", y="FIC14.PV", ax=ax[1])
+#validationData.plot(x='time_min', y="FIC13.MV", ax=ax[1])
 validationData.plot(x="time_min", y="TC01.MV", ax=ax[2])
 validationData.plot(x="time_min", y="PC10.PV", ax=ax[2])
 ax[0].plot(validationData["time_min"], simulator.data._x[:, TI21])

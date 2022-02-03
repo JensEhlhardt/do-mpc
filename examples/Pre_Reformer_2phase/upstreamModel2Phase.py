@@ -26,6 +26,7 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
         A_r_E = 2 * r_E * np.pi * dz_E  # [m²] heat transfer area between wall and fluid
         A_z_W = ((r_E + dr_E)**2 - r_E**2) * np.pi  # [m²] cross sectional area of the wall
         A_r_W = (r_E + dr_E) * 2 * np.pi * dz_E  # [m²] transfer area between wall and isolation
+        A_z_P = r_E**2 * np.pi * (1-gammaP) # [m²] pseudo cross sectional area of the packing
 
         P = 30e5  # [Pa] pressure
 
@@ -33,7 +34,8 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
         rhoW = 7.87e6  # [g/m³] density of the wall
         cpW = 0.5  # [J/g/k] heat capacity of the wall
         T_Env = 20  # [°C] environmental temperature
-        kEvap = 1.4  # [W/m²] heat loss coefficient
+        kEvap = 3 #1.4  # [W/m²] heat loss coefficient
+        S_V = 1000  # [m²/m³] specific surface packing
 
         rhoL = CP.PropsSI("D", "Q", 0, "P", P, "Water") * 1000  # [g/m³] # density of the liquid phase
         rhoV = CP.PropsSI("D", "Q", 1, "P", P, "Water") * 1000  # [g/m³] # density of the vapor phase
@@ -45,15 +47,15 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
         hV = CP.PropsSI("H", "Q", 1, "P", P, "Water") / 1000  # j/g
         hLV = hV - hL  # [j/g] heat of evaporation
         T_sat = CP.PropsSI("T", "Q", 0, "P", P, "Water")-273.15 # [°C] saturation temperature
-        U_L = 2000  # [] heat transfer coefficient liquid phase
-        U_V = 1000   # [] heat transfer coefficient vapor phase
+        U_L = 1000  # [] heat transfer coefficient liquid phase
+        U_V = 500   # [] heat transfer coefficient vapor phase
 
         ## set the variables
         a_E = model.set_variable(var_type='_x', var_name='a_E', shape=(nD_Evap, 1))  # volume fraction of the liquid
         T_FE = model.set_variable(var_type='_x', var_name='T_FE', shape=(nD_Evap, 1))  # pseudo fluid temperature
         T_WE = model.set_variable(var_type='_x', var_name='T_WE', shape=(nD_Evap, 1))  # wall temperature
-
-
+        T_PE = model.set_variable(var_type='_x', var_name='T_PE', shape=(nD_Evap, 1))  # packing temperature
+        #v_LL = model.set_variable(var_type='_x', var_name='v_LL', shape=(nD_Evap, 1))
         # set the inputs
         Qdot_E = model.set_variable(var_type='_u', var_name='Qdot_E', shape=(1, 1))  # [%] heating power percentage evaporator
         mdot_W = model.set_variable(var_type='_u', var_name='mdot_W', shape=(1, 1))  # [g/s] inlet flow of water
@@ -93,6 +95,7 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
         da_E = SX.sym('da_E',  nD_Evap, 1)
         dT_FE = SX.sym('dT_FE', nD_Evap, 1)
         dT_WE = SX.sym('dT_WE', nD_Evap, 1)
+        dT_PE = SX.sym('dT_PE', nD_Evap, 1)
 
         # calculate the heating power from MV
         Qdot_E = Qdot_E * 3600 / 100  # [W]
@@ -109,7 +112,7 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
 
             # compute the mass streams due to condensation and evaporation
             mDotE_i = mDotE(a_E[i], T_FE[i], T_sat) * rhoL
-            mDotC_i = mDotC(a_E[i], T_FE[i], T_sat) * rhoV
+            mDotC_i = mDotC(a_E[i], T_FE[i], T_sat) * rhoL
 
             # get the heating power i
             iZ = i * dz_E
@@ -139,7 +142,8 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
                     - delta_i * T_FE[i] * da_dz_i / (rhoF_i * cpF_i * A_z_E) \
                     - 1 * T_FE[i] * (cpF_i * (rhoL-rhoV) * V_i + rhoF_i * V_i * (cpL - cpV)) * da_E[i] / (rhoF_i * cpF_i * V_i) \
                     - (mDotE_i - mDotC_i) * hLV / (cpF_i * rhoF_i) \
-                    + U_F_i * A_r_E * (T_WE[i] - T_FE[i]) / (cpF_i * rhoF_i * A_z_E * dz_E)
+                    + U_F_i * A_r_E * (T_WE[i] - T_FE[i]) / (cpF_i * rhoF_i * A_z_E * dz_E) \
+                    - (U_F_i * S_V * A_z_P * dz_E) / (rhoF_i*cpF_i*V_i) * (T_FE[i] - T_PE[i])
 
             # wall temperature
             if i != 0 and i != (nD_Evap-1):
@@ -148,6 +152,8 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
                         - U_F_i * A_r_E * (T_WE[i] - T_FE[i]) / (cpW * rhoW * A_z_W * dz_E) \
                         - kEvap * A_r_W * (T_WE[i] - T_Env) / (cpW * rhoW * A_z_W * dz_E)
 
+            # packing temperature
+            dT_PE[i] = (U_F_i * S_V) / (rhoW*cpW) * (T_FE[i] - T_PE[i])
 
         ## Set boundary conditions #####################################################################################
 
@@ -184,6 +190,7 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
         model.set_rhs('a_E', da_E)
         model.set_rhs('T_FE', dT_FE)
         model.set_rhs('T_WE', dT_WE)
+        model.set_rhs('T_PE', dT_PE)
 
         # construct model
         model.setup()
@@ -194,6 +201,6 @@ def template_model(system_type='SX', nD_Evap=40, modelUsage=0):
 def getRawInitialState(model):
     nD = int(model.n_x / len(model._x.keys()))
 
-    x0 = vertcat(np.ones([nD, 1]), np.ones([2*nD, 1]) * 50)
+    x0 = vertcat(np.ones([nD, 1]), np.ones([3*nD, 1]) * 50)
 
     return x0
