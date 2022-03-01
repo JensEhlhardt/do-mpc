@@ -49,8 +49,8 @@ def template_model(system_type='SX', nD_Evap=40, nD_Pipe=10, nD_Super=20, nD_Pre
         A_S_w = A_z_W
         A_S_wr = (r_E + dr_E) * 2 * np.pi * dz_S
 
-        A_R_z = r_R ** 2 * np.pi * gammaP
-        A_R_P = r_R ** 2 * np.pi * (1-gammaP)
+        A_R_z = r_R ** 2 * np.pi * 0.45
+        A_R_P = r_R ** 2 * np.pi * (1-0.45)
         A_R_w = ((r_R+dr_R)**2 - r_R**2) * np.pi
         A_R_r = r_R * 2 * np.pi * dz_R
         A_R_wr = (r_R + dr_R) * 2 * np.pi * dz_R
@@ -65,9 +65,9 @@ def template_model(system_type='SX', nD_Evap=40, nD_Pipe=10, nD_Super=20, nD_Pre
         cpW = 0.5  # [J/g/k] heat capacity of the wall
         T_Env = 20  # [°C] environmental temperature
         kEvap = 2  # [W/m²] heat loss coefficient
-        kPipe = 25
-        kSuper = 6
-        kPre = 1
+        kPipe = 30
+        kSuper = 0
+        kPre = 0
         S_V = 1000  # [m²/m³] specific surface packing
 
         rhoL = CP.PropsSI("D", "Q", 0, "P", P, "Water") * 1000  # [g/m³] # density of the liquid phase
@@ -272,7 +272,7 @@ def template_model(system_type='SX', nD_Evap=40, nD_Pipe=10, nD_Super=20, nD_Pre
                 if i < nD_Pre:
                     dT_FR[i] = -v_L * ((1-a_R[i])*S_L + S_L) * A_E_R * dT_FR_dz_i \
                             + U_R_i * A_R_r * (T_WR[i] - T_FR[i]) / (cpR_i * rhoR_i * A_R_z * dz_R) \
-                            - (mDotE_Ri - mDotC_Ri) * hLV / (cpR_i * rhoR_i) \
+                            - 0*(mDotE_Ri - mDotC_Ri) * hLV / (cpR_i * rhoR_i) \
 
             # wall temperature
             if i != 0 and i != (nD_Evap-1):
@@ -397,11 +397,11 @@ def template_model(system_type='SX', nD_Evap=40, nD_Pipe=10, nD_Super=20, nD_Pre
         # return object
         return model
 
-def getRawInitialState(model):
-    nD = 40 #int(model.n_x / len(model._x.keys()))
-    nD_P = 40
-    nD_S = 40
-    nD_R = 40
+def getRawInitialState(model, nD_Evap=40, nD_Pipe=10, nD_Super=20, nD_Pre = 30):
+    nD = nD_Evap #int(model.n_x / len(model._x.keys()))
+    nD_P = nD_Pipe
+    nD_S = nD_Super
+    nD_R = nD_Pre
 
     x0 = vertcat(np.ones([nD, 1]), np.ones([3*nD, 1]) * 50, np.ones([nD_P, 1]), np.ones([2*nD_P, 1]) * 50,
                  np.ones([nD_S, 1]), np.ones([3*nD_S, 1]) * 50,

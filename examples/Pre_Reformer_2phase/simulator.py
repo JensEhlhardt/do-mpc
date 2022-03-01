@@ -45,6 +45,8 @@ def convergeToSteadyState(simulator, u0, tSteps=200):
         #print(i)
         try:
             simulator.make_step(u0)
+            if i == 50:
+                print("hallo")
         except:
             break
     return simulator
